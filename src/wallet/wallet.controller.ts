@@ -25,6 +25,7 @@ import {
   TransferResponseDto,
   TransactionsResponseDto,
 } from '../dto/wallet.dto';
+import { PaystackWebhookDto } from '../dto/webhook.dto';
 import { CombinedAuthGuard } from '../guards/combined-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Permissions } from '../guards/permissions.decorator';
@@ -95,7 +96,7 @@ export class WalletController {
   @Post('paystack/webhook')
   @Throttle({ webhook: { limit: 100, ttl: 60000 } }) // 100 webhooks per minute
   async handleWebhook(
-    @Body() body: any,
+    @Body() body: PaystackWebhookDto,
     @Headers('x-paystack-signature') signature: string,
   ): Promise<{ status: boolean }> {
     console.log('Webhook received:', { body, signature });

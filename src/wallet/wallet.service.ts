@@ -29,6 +29,20 @@ export class WalletService {
       throw new BadRequestException('User email required for deposit');
     }
 
+    // Check for existing pending deposit to prevent duplicates (idempotency)
+    const existingPending = await this.transactionRepository.findOne({
+      where: {
+        userId,
+        status: TransactionStatus.PENDING,
+        type: TransactionType.DEPOSIT
+      },
+      order: { createdAt: 'DESC' }
+    });
+
+    if (existingPending && (Date.now() - existingPending.createdAt.getTime() < 300000)) { // 5 minutes
+      throw new BadRequestException('Pending deposit already exists. Please wait for completion or check status.');
+    }
+
     let transaction: Transaction | undefined;
 
     try {
@@ -205,7 +219,7 @@ export class WalletService {
   async handleWebhook(data: any): Promise<void> {
     this.logger.log(`Processing webhook for reference: ${data.reference}, status: ${data.status}`, 'handleWebhook');
 
-    const { reference, status } = data;
+    const { reference, status, id: eventId } = data;
 
     const transaction = await this.transactionRepository.findOne({ where: { reference } });
     this.logger.debug(`Transaction lookup result: ${!!transaction}`, 'handleWebhook');
@@ -215,10 +229,17 @@ export class WalletService {
       return; // Idempotent
     }
 
+    // Prevent webhook replay attacks by checking event ID
+    if (transaction.paystackEventId) {
+      this.logger.warn(`Webhook already processed for event ID: ${eventId}`, 'handleWebhook');
+      return; // Already processed this event
+    }
+
     if (status === 'success') {
       this.logger.log(`Payment successful for reference: ${reference}, crediting wallet`, 'handleWebhook');
 
       transaction.status = TransactionStatus.SUCCESS;
+      transaction.paystackEventId = eventId; // Store event ID to prevent replay
       await this.transactionRepository.save(transaction);
 
       // Credit wallet with precise decimal arithmetic
@@ -238,6 +259,7 @@ export class WalletService {
     } else {
       this.logger.warn(`Payment failed for reference: ${reference}`, 'handleWebhook');
       transaction.status = TransactionStatus.FAILED;
+      transaction.paystackEventId = eventId; // Store event ID to prevent replay
       await this.transactionRepository.save(transaction);
     }
   }

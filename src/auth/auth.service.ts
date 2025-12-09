@@ -27,7 +27,7 @@ export class AuthService {
       user = await this.userRepository.save(user);
 
       // auto-create wallet
-      const walletNumber = this.generateWalletNumber();
+      const walletNumber = await this.generateWalletNumber();
       const wallet = this.walletRepository.create({
         userId: user.id,
         walletNumber,
@@ -43,8 +43,20 @@ export class AuthService {
     return { jwt };
   }
 
-  private generateWalletNumber(): string {
-    // Generate 13-digit wallet number (as per task example: 4566678954356)
-    return Math.random().toString().slice(2, 15);
+  private async generateWalletNumber(): Promise<string> {
+    let walletNumber: string;
+    let attempts = 0;
+
+    do {
+      walletNumber = Math.random().toString().slice(2, 15);
+      attempts++;
+
+      if (attempts > 10) {
+        throw new Error('Failed to generate unique wallet number after 10 attempts');
+      }
+    } while (await this.walletRepository.findOne({ where: { walletNumber } }));
+
+    return walletNumber;
   }
 }
+

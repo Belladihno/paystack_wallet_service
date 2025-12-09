@@ -49,6 +49,9 @@ export class Transaction {
   @Column({ nullable: true })
   senderWalletNumber: string;
 
+  @Column({ nullable: true })
+  paystackEventId: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
