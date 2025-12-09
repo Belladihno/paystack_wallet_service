@@ -5,6 +5,7 @@ import { Wallet } from '../entities/wallet.entity';
 import { Transaction, TransactionType, TransactionStatus } from '../entities/transaction.entity';
 import { DepositDto, DepositResponseDto, DepositStatusResponseDto, BalanceResponseDto, TransferDto, TransferResponseDto, TransactionsResponseDto, TransactionDto } from '../dto/wallet.dto';
 import Paystack from 'paystack-api';
+import Decimal from 'decimal.js';
 
 @Injectable()
 export class WalletService {
@@ -22,6 +23,11 @@ export class WalletService {
 
   async deposit(userId: string, dto: DepositDto, userEmail?: string): Promise<DepositResponseDto> {
     this.logger.log(`Deposit initiated for user ${userId}, amount: ${dto.amount}`, 'deposit');
+
+    // Validate user email is available for Paystack
+    if (!userEmail) {
+      throw new BadRequestException('User email required for deposit');
+    }
 
     let transaction: Transaction | undefined;
 
@@ -90,7 +96,14 @@ export class WalletService {
 
   async transfer(userId: string, dto: TransferDto): Promise<TransferResponseDto> {
     const senderWallet = await this.walletRepository.findOne({ where: { userId } });
-    if (!senderWallet || senderWallet.balance < dto.amount) {
+    if (!senderWallet) {
+      throw new BadRequestException('Sender wallet not found');
+    }
+
+    const senderBalance = new Decimal(senderWallet.balance);
+    const transferAmount = new Decimal(dto.amount);
+
+    if (senderBalance.lessThan(transferAmount)) {
       throw new BadRequestException('Insufficient balance');
     }
 
@@ -99,15 +112,44 @@ export class WalletService {
       throw new BadRequestException('Recipient wallet not found');
     }
 
-    // Atomic transfer
-    await this.walletRepository.manager.transaction(async manager => {
-      // Deduct from sender
-      senderWallet.balance -= dto.amount;
-      await manager.save(senderWallet);
+    // Prevent self-transfer
+    if (senderWallet.walletNumber === dto.wallet_number) {
+      throw new BadRequestException('Cannot transfer to own wallet');
+    }
 
-      // Add to recipient
-      recipientWallet.balance += dto.amount;
-      await manager.save(recipientWallet);
+    // Atomic transfer with pessimistic locking
+    await this.walletRepository.manager.transaction(async manager => {
+      // Lock sender wallet for update
+      const lockedSenderWallet = await manager.findOne(Wallet, {
+        where: { userId },
+        lock: { mode: 'pessimistic_write' }
+      });
+
+      if (!lockedSenderWallet) {
+        throw new BadRequestException('Sender wallet not found');
+      }
+
+      const currentSenderBalance = new Decimal(lockedSenderWallet.balance);
+      if (currentSenderBalance.lessThan(transferAmount)) {
+        throw new BadRequestException('Insufficient balance');
+      }
+
+      // Lock recipient wallet for update
+      const lockedRecipientWallet = await manager.findOne(Wallet, {
+        where: { walletNumber: dto.wallet_number },
+        lock: { mode: 'pessimistic_write' }
+      });
+
+      if (!lockedRecipientWallet) {
+        throw new BadRequestException('Recipient wallet not found');
+      }
+
+      // Perform atomic balance updates using Decimal.js
+      lockedSenderWallet.balance = currentSenderBalance.minus(transferAmount).toNumber();
+      lockedRecipientWallet.balance = new Decimal(lockedRecipientWallet.balance).plus(transferAmount).toNumber();
+
+      await manager.save(lockedSenderWallet);
+      await manager.save(lockedRecipientWallet);
 
       // Record transactions
       const senderTransaction = manager.create(Transaction, {
@@ -179,17 +221,17 @@ export class WalletService {
       transaction.status = TransactionStatus.SUCCESS;
       await this.transactionRepository.save(transaction);
 
-      // Credit wallet
+      // Credit wallet with precise decimal arithmetic
       const wallet = await this.walletRepository.findOne({ where: { userId: transaction.userId } });
 
       if (wallet) {
-        const oldBalance = Number(wallet.balance);
-        const creditAmount = Number(transaction.amount);
-        const newBalance = oldBalance + creditAmount;
+        const oldBalance = new Decimal(wallet.balance);
+        const creditAmount = new Decimal(transaction.amount);
+        const newBalance = oldBalance.plus(creditAmount);
 
-        wallet.balance = newBalance;
+        wallet.balance = newBalance.toNumber();
         await this.walletRepository.save(wallet);
-        this.logger.log(`Wallet credited: user ${transaction.userId}, ${oldBalance} → ${newBalance}`, 'handleWebhook');
+        this.logger.log(`Wallet credited: user ${transaction.userId}, ${oldBalance.toString()} → ${newBalance.toString()}`, 'handleWebhook');
       } else {
         this.logger.error(`Wallet not found for user: ${transaction.userId}`, 'handleWebhook');
       }

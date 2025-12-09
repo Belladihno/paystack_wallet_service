@@ -1,4 +1,4 @@
-import { IsNumber, IsString, IsOptional } from 'class-validator';
+import { IsNumber, IsString, IsOptional, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TransactionType, TransactionStatus } from '../entities/transaction.entity';
 
@@ -6,9 +6,12 @@ export class DepositDto {
   @ApiProperty({
     description: 'Amount to deposit in Naira (will be converted to kobo for Paystack)',
     example: 5000,
-    minimum: 100
+    minimum: 100,
+    maximum: 10000000
   })
   @IsNumber()
+  @Min(100, { message: 'Minimum deposit amount is ₦100' })
+  @Max(10000000, { message: 'Maximum deposit amount is ₦10,000,000' })
   amount: number;
 }
 
@@ -72,9 +75,12 @@ export class TransferDto {
   @ApiProperty({
     description: 'Amount to transfer in Naira',
     example: 3000,
-    minimum: 100
+    minimum: 100,
+    maximum: 10000000
   })
   @IsNumber()
+  @Min(100, { message: 'Minimum transfer amount is ₦100' })
+  @Max(10000000, { message: 'Maximum transfer amount is ₦10,000,000' })
   amount: number;
 }
 

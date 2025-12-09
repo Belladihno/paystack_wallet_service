@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { ApiKey } from '../entities/api-key.entity';
 import { User } from '../entities/user.entity';
 import { CreateApiKeyDto, CreateApiKeyResponseDto, RolloverApiKeyDto } from '../dto/api-key.dto';
@@ -17,7 +17,11 @@ export class ApiKeyService {
 
   async createApiKey(userId: string, dto: CreateApiKeyDto): Promise<CreateApiKeyResponseDto> {
     const activeKeys = await this.apiKeyRepository.count({
-      where: { userId, revoked: false },
+      where: {
+        userId,
+        revoked: false,
+        expiresAt: MoreThan(new Date())
+      },
     });
     if (activeKeys >= 5) {
       throw new BadRequestException('Maximum 5 active API keys allowed per user');
@@ -25,10 +29,12 @@ export class ApiKeyService {
 
     const expiresAt = this.calculateExpiry(dto.expiry);
     const apiKey = this.generateApiKey();
+    const keyPrefix = apiKey.substring(0, 8);
     const hashedKey = await bcrypt.hash(apiKey, 10);
 
     const newKey = this.apiKeyRepository.create({
       userId,
+      keyPrefix,
       hashedKey,
       name: dto.name,
       permissions: dto.permissions,
@@ -57,7 +63,11 @@ export class ApiKeyService {
 
     // Check if creating new key would exceed 5-key limit
     const activeKeys = await this.apiKeyRepository.count({
-      where: { userId, revoked: false },
+      where: {
+        userId,
+        revoked: false,
+        expiresAt: MoreThan(new Date())
+      },
     });
     if (activeKeys >= 5) {
       throw new BadRequestException('Maximum 5 active API keys allowed per user');
@@ -65,10 +75,12 @@ export class ApiKeyService {
 
     const expiresAt = this.calculateExpiry(dto.expiry);
     const apiKey = this.generateApiKey();
+    const keyPrefix = apiKey.substring(0, 8);
     const hashedKey = await bcrypt.hash(apiKey, 10);
 
     const newKey = this.apiKeyRepository.create({
       userId,
+      keyPrefix,
       hashedKey,
       name: expiredKey.name,
       permissions: expiredKey.permissions,
@@ -94,15 +106,21 @@ export class ApiKeyService {
   }
 
   async validateApiKey(apiKey: string): Promise<{ user: User; permissions: string[] } | null> {
-    const keys = await this.apiKeyRepository.find({
-      where: { revoked: false },
+    const keyPrefix = apiKey.substring(0, 8);
+
+    // First, find keys with matching prefix (much more efficient)
+    const candidateKeys = await this.apiKeyRepository.find({
+      where: {
+        keyPrefix,
+        revoked: false,
+        expiresAt: MoreThan(new Date()) // Only non-expired keys
+      },
       relations: ['user'],
     });
-    for (const key of keys) {
+
+    // Then verify the exact key with bcrypt (only for matching prefixes)
+    for (const key of candidateKeys) {
       if (await bcrypt.compare(apiKey, key.hashedKey)) {
-        if (key.expiresAt < new Date()) {
-          throw new BadRequestException('API key expired');
-        }
         return { user: key.user, permissions: key.permissions };
       }
     }

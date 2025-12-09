@@ -18,6 +18,9 @@ export class ApiKey {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ length: 8 })
+  keyPrefix: string;
+
   @Column()
   hashedKey: string;
 
