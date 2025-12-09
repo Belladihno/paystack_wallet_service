@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -8,13 +9,31 @@ import { User, Wallet, Transaction, ApiKey } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { ApiKeyModule } from './api-key/api-key.module';
 import { WalletModule } from './wallet/wallet.module';
+import { HealthModule } from './health/health.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { CustomLogger } from './logger/logger.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 1 minute
+        limit: 10, // 10 requests per minute for general endpoints
+      },
+      {
+        name: 'webhook',
+        ttl: 60000,
+        limit: 100, // Higher limit for webhooks
+      },
+      {
+        name: 'deposit',
+        ttl: 60000,
+        limit: 5, // Lower limit for deposits to prevent abuse
+      },
+    ]),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DATABASE_HOST,
@@ -29,6 +48,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     AuthModule,
     ApiKeyModule,
     WalletModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_FILTER, useClass: AllExceptionsFilter }],

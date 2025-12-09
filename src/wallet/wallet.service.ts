@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Wallet } from '../entities/wallet.entity';
@@ -8,6 +8,7 @@ import Paystack from 'paystack-api';
 
 @Injectable()
 export class WalletService {
+  private readonly logger = new Logger(WalletService.name);
   private paystack: any;
 
   constructor(
@@ -20,20 +21,20 @@ export class WalletService {
   }
 
   async deposit(userId: string, dto: DepositDto, userEmail?: string): Promise<DepositResponseDto> {
-    console.log('Deposit called with:', { userId, amount: dto.amount, userEmail });
+    this.logger.log(`Deposit initiated for user ${userId}, amount: ${dto.amount}`, 'deposit');
 
     let transaction: Transaction | undefined;
 
     try {
       const wallet = await this.walletRepository.findOne({ where: { userId } });
-      console.log('Wallet found:', wallet);
+      this.logger.debug(`Wallet found for user ${userId}: ${!!wallet}`, 'deposit');
 
       if (!wallet) {
         throw new BadRequestException('Wallet not found');
       }
 
       const reference = this.generateReference();
-      console.log('Generated reference:', reference);
+      this.logger.debug(`Generated reference: ${reference}`, 'deposit');
 
       // Create pending transaction
       transaction = this.transactionRepository.create({
@@ -42,11 +43,12 @@ export class WalletService {
         amount: dto.amount,
         status: TransactionStatus.PENDING,
         reference,
+        description: `Deposit of ₦${dto.amount}`,
       });
-      console.log('Transaction created:', transaction);
+      this.logger.debug(`Transaction created with ID: ${transaction.id}`, 'deposit');
 
       await this.transactionRepository.save(transaction);
-      console.log('Transaction saved successfully');
+      this.logger.log(`Transaction saved successfully for reference: ${reference}`, 'deposit');
 
       // Initialize Paystack transaction
       const response = await this.paystack.transaction.initialize({
@@ -61,12 +63,18 @@ export class WalletService {
         authorization_url: response.data.authorization_url,
       };
     } catch (error: any) {
-      console.error('Deposit Error:', error.response?.data || error.message);
+      this.logger.error(`Deposit failed: ${error.response?.data?.message || error.message}`, 'deposit');
 
-      // If transaction was created, mark it as failed
+      // Rollback: If transaction was created but Paystack failed, mark as failed
       if (transaction) {
-        transaction.status = TransactionStatus.FAILED;
-        await this.transactionRepository.save(transaction);
+        try {
+          transaction.status = TransactionStatus.FAILED;
+          transaction.description = `Failed deposit: ${error.response?.data?.message || error.message}`;
+          await this.transactionRepository.save(transaction);
+          this.logger.log(`Transaction ${transaction.id} marked as failed due to Paystack error`, 'deposit');
+        } catch (rollbackError) {
+          this.logger.error(`Failed to rollback transaction ${transaction.id}: ${rollbackError.message}`, 'deposit');
+        }
       }
 
       throw new BadRequestException(
@@ -108,6 +116,8 @@ export class WalletService {
         amount: dto.amount,
         status: TransactionStatus.SUCCESS,
         recipientWalletNumber: dto.wallet_number,
+        senderWalletNumber: senderWallet.walletNumber,
+        description: `Transfer to wallet ${dto.wallet_number}`,
       });
       await manager.save(senderTransaction);
 
@@ -116,6 +126,8 @@ export class WalletService {
         type: TransactionType.INCOMING_TRANSFER,
         amount: dto.amount,
         status: TransactionStatus.SUCCESS,
+        senderWalletNumber: senderWallet.walletNumber,
+        description: `Transfer from wallet ${senderWallet.walletNumber}`,
       });
       await manager.save(recipientTransaction);
     });
@@ -141,34 +153,34 @@ export class WalletService {
       type: t.type,
       amount: t.amount,
       status: t.status,
+      description: t.description,
+      senderWalletNumber: t.senderWalletNumber,
+      recipientWalletNumber: t.recipientWalletNumber,
     }));
     return { transactions: transactionDtos };
   }
 
   async handleWebhook(data: any): Promise<void> {
-    console.log('Processing webhook data:', data);
+    this.logger.log(`Processing webhook for reference: ${data.reference}, status: ${data.status}`, 'handleWebhook');
 
     const { reference, status } = data;
-    console.log('Webhook reference:', reference, 'status:', status);
 
     const transaction = await this.transactionRepository.findOne({ where: { reference } });
-    console.log('Found transaction:', transaction);
+    this.logger.debug(`Transaction lookup result: ${!!transaction}`, 'handleWebhook');
 
     if (!transaction || transaction.status !== TransactionStatus.PENDING) {
-      console.log('Transaction not found or not pending, skipping');
+      this.logger.warn(`Transaction not found or not pending for reference: ${reference}`, 'handleWebhook');
       return; // Idempotent
     }
 
     if (status === 'success') {
-      console.log('Payment successful, updating transaction and wallet');
+      this.logger.log(`Payment successful for reference: ${reference}, crediting wallet`, 'handleWebhook');
 
       transaction.status = TransactionStatus.SUCCESS;
       await this.transactionRepository.save(transaction);
-      console.log('Transaction updated to SUCCESS');
 
       // Credit wallet
       const wallet = await this.walletRepository.findOne({ where: { userId: transaction.userId } });
-      console.log('Found wallet:', wallet);
 
       if (wallet) {
         const oldBalance = Number(wallet.balance);
@@ -177,12 +189,12 @@ export class WalletService {
 
         wallet.balance = newBalance;
         await this.walletRepository.save(wallet);
-        console.log(`Wallet credited: ${oldBalance} → ${newBalance}`);
+        this.logger.log(`Wallet credited: user ${transaction.userId}, ${oldBalance} → ${newBalance}`, 'handleWebhook');
       } else {
-        console.log('Wallet not found for user:', transaction.userId);
+        this.logger.error(`Wallet not found for user: ${transaction.userId}`, 'handleWebhook');
       }
     } else {
-      console.log('Payment failed, updating transaction status');
+      this.logger.warn(`Payment failed for reference: ${reference}`, 'handleWebhook');
       transaction.status = TransactionStatus.FAILED;
       await this.transactionRepository.save(transaction);
     }
@@ -192,3 +204,4 @@ export class WalletService {
     return 'ref_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
   }
 }
+

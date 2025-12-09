@@ -1,6 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { CustomLogger } from './logger/logger.service';
+import { ResponseInterceptor } from './interceptors/response.interceptor';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 
 // Environment variable validation
@@ -41,10 +44,16 @@ async function bootstrap(): Promise<void> {
   // Validate environment variables first
   validateEnvironmentVariables();
 
-  const app = await NestFactory.create(AppModule);
+  const customLogger = new CustomLogger();
+  const app = await NestFactory.create(AppModule, {
+    logger: customLogger,
+  });
 
   // Global exception filter
   app.useGlobalFilters(new AllExceptionsFilter());
+
+  // Global response interceptor
+  app.useGlobalInterceptors(new ResponseInterceptor());
 
   // Global validation pipe
   app.useGlobalPipes(new ValidationPipe({
@@ -56,7 +65,47 @@ async function bootstrap(): Promise<void> {
     },
   }));
 
-  await app.listen(process.env.PORT ?? 3000);
+  // Swagger documentation
+  const config = new DocumentBuilder()
+    .setTitle('Paystack Wallet Service API')
+    .setDescription('A comprehensive wallet service with Paystack integration, JWT authentication, and API key management')
+    .setVersion('1.0')
+    .addTag('auth', 'Authentication endpoints')
+    .addTag('wallet', 'Wallet operations')
+    .addTag('keys', 'API key management')
+    .addTag('health', 'Health monitoring')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth',
+    )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'x-api-key',
+        in: 'header',
+        description: 'API key for service-to-service authentication',
+      },
+      'api-key',
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+  });
+
+  await app.listen(process.env.PORT || 3000);
   console.log(`Application is running on: http://localhost:${process.env.PORT ?? 3000}`);
 }
 

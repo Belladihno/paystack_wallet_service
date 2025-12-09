@@ -12,6 +12,8 @@ import {
   Headers,
   BadRequestException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiHeader, ApiParam } from '@nestjs/swagger';
 import { createHmac } from 'crypto';
 import { WalletService } from './wallet.service';
 import {
@@ -28,11 +30,13 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { Permissions } from '../guards/permissions.decorator';
 import { Permission } from '../entities/api-key.entity';
 
+@ApiTags('wallet')
 @Controller('wallet')
 export class WalletController {
   constructor(private walletService: WalletService) {}
 
   @Post('deposit')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 deposits per minute
   @UseGuards(CombinedAuthGuard)
   @Permissions(Permission.DEPOSIT)
   async deposit(
@@ -89,6 +93,7 @@ export class WalletController {
   }
 
   @Post('paystack/webhook')
+  @Throttle({ webhook: { limit: 100, ttl: 60000 } }) // 100 webhooks per minute
   async handleWebhook(
     @Body() body: any,
     @Headers('x-paystack-signature') signature: string,

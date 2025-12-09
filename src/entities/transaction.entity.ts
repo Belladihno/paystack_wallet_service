@@ -37,11 +37,17 @@ export class Transaction {
   })
   status: TransactionStatus;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   reference: string;
 
   @Column({ nullable: true })
   recipientWalletNumber: string;
+
+  @Column({ nullable: true })
+  description: string;
+
+  @Column({ nullable: true })
+  senderWalletNumber: string;
 
   @CreateDateColumn()
   createdAt: Date;
