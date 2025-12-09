@@ -46,8 +46,21 @@ export class ApiKeyService {
     const expiredKey = await this.apiKeyRepository.findOne({
       where: { id: dto.expired_key_id, userId, revoked: false },
     });
-    if (!expiredKey || expiredKey.expiresAt > new Date()) {
-      throw new BadRequestException('Invalid or not expired API key');
+    if (!expiredKey) {
+      throw new BadRequestException('API key not found');
+    }
+
+    // Check if the key is actually expired
+    if (expiredKey.expiresAt > new Date()) {
+      throw new BadRequestException('API key has not expired yet');
+    }
+
+    // Check if creating new key would exceed 5-key limit
+    const activeKeys = await this.apiKeyRepository.count({
+      where: { userId, revoked: false },
+    });
+    if (activeKeys >= 5) {
+      throw new BadRequestException('Maximum 5 active API keys allowed per user');
     }
 
     const expiresAt = this.calculateExpiry(dto.expiry);

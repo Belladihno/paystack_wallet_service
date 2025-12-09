@@ -104,7 +104,7 @@ export class WalletService {
       // Record transactions
       const senderTransaction = manager.create(Transaction, {
         userId,
-        type: TransactionType.TRANSFER,
+        type: TransactionType.OUTGOING_TRANSFER,
         amount: dto.amount,
         status: TransactionStatus.SUCCESS,
         recipientWalletNumber: dto.wallet_number,
@@ -113,7 +113,7 @@ export class WalletService {
 
       const recipientTransaction = manager.create(Transaction, {
         userId: recipientWallet.userId,
-        type: TransactionType.TRANSFER,
+        type: TransactionType.INCOMING_TRANSFER,
         amount: dto.amount,
         status: TransactionStatus.SUCCESS,
       });

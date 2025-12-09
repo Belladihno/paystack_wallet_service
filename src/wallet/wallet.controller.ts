@@ -10,7 +10,9 @@ import {
   UseGuards,
   RawBodyRequest,
   Headers,
+  BadRequestException,
 } from '@nestjs/common';
+import { createHmac } from 'crypto';
 import { WalletService } from './wallet.service';
 import {
   DepositDto,
@@ -93,8 +95,23 @@ export class WalletController {
   ): Promise<{ status: boolean }> {
     console.log('Webhook received:', { body, signature });
 
-    // Validate signature
-    // For simplicity, assume valid
+    // Validate Paystack signature
+    const secret = process.env.PAYSTACK_SECRET_KEY;
+    if (!secret) {
+      throw new BadRequestException('Paystack secret key not configured');
+    }
+
+    const expectedSignature = createHmac('sha512', secret)
+      .update(JSON.stringify(body))
+      .digest('hex');
+
+    if (signature !== expectedSignature) {
+      console.error('Invalid webhook signature');
+      throw new BadRequestException('Invalid webhook signature');
+    }
+
+    console.log('Webhook signature validated successfully');
+
     await this.walletService.handleWebhook(body.data);
     console.log('Webhook processed successfully');
 

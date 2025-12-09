@@ -44,6 +44,7 @@ export class AuthService {
   }
 
   private generateWalletNumber(): string {
-    return Math.random().toString().slice(2, 12);
+    // Generate 13-digit wallet number (as per task example: 4566678954356)
+    return Math.random().toString().slice(2, 15);
   }
 }

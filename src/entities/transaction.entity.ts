@@ -9,7 +9,8 @@ import { User } from './user.entity';
 
 export enum TransactionType {
   DEPOSIT = 'deposit',
-  TRANSFER = 'transfer',
+  OUTGOING_TRANSFER = 'outgoing_transfer',
+  INCOMING_TRANSFER = 'incoming_transfer',
 }
 
 export enum TransactionStatus {
