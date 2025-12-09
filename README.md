@@ -1,98 +1,128 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Paystack Wallet Service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A robust backend service for a simple wallet system built with NestJS, integrated with Paystack for handling deposits. This service provides a secure and scalable foundation for applications requiring wallet functionalities.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Features
 
-## Description
+- **User & Authentication**: Secure user authentication via Google OAuth.
+- **API Key Management**: Generate and manage API keys for programmatic access with specific permissions (deposit, transfer, read).
+- **Wallet Management**: Automatic wallet creation for new users with a unique, collision-resistant wallet number.
+- **Paystack Integration**: Seamlessly handle deposits via Paystack, with secure webhook processing using signature validation.
+- **Fund Transfers**: Perform atomic wallet-to-wallet transfers between users, ensuring data integrity.
+- **Financial Integrity**: Uses `Decimal.js` for all monetary calculations to avoid floating-point inaccuracies.
+- **Transaction History**: Keeps a record of all wallet activities (deposits, transfers).
+- **Security**:
+  - Protection against webhook replay attacks.
+  - Rate limiting on sensitive endpoints.
+  - JWT-based authentication for users and API keys.
+  - Environment-based secrets management.
+- **Scheduled Tasks**:
+  - Automatically revokes expired API keys.
+  - Automatically times out and fails pending transactions that are not completed within 24 hours.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Tech Stack
 
-## Project setup
+- **Framework**: [NestJS](https://nestjs.com/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Database**: [PostgreSQL](https://www.postgresql.org/)
+- **ORM**: [TypeORM](https://typeorm.io/)
+- **Authentication**: [Passport.js](https://www.passportjs.org/) (JWT & Google Strategy)
+- **Payments**: [Paystack](https://paystack.com/)
+- **API Documentation**: [Swagger](https://swagger.io/)
 
-```bash
-$ npm install
-```
+## Prerequisites
 
-## Compile and run the project
+- [Node.js](https://nodejs.org/en/) (v18 or newer recommended)
+- [NPM](https://www.npmjs.com/)
+- [PostgreSQL](https://www.postgresql.org/download/) running instance
+- A [Paystack](https://paystack.com/) account (for secret key)
+- A [Google Cloud Platform](https://console.cloud.google.com/) project with OAuth 2.0 credentials
 
-```bash
-# development
-$ npm run start
+## Installation & Setup
 
-# watch mode
-$ npm run start:dev
+1.  **Clone the repository:**
+    ```bash
+    git clone <your-repository-url>
+    cd paystack_wallet_service
+    ```
 
-# production mode
-$ npm run start:prod
-```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-## Run tests
+3.  **Set up environment variables:**
+    Create a `.env` file in the root directory by copying the example:
+    ```bash
+    cp .env.example .env
+    ```
+    Fill in the required values in the `.env` file:
 
-```bash
-# unit tests
-$ npm run test
+    ```env
+    # Database
+    DB_HOST=localhost
+    DB_PORT=5432
+    DB_USERNAME=your_db_user
+    DB_PASSWORD=your_db_password
+    DB_DATABASE=your_db_name
 
-# e2e tests
-$ npm run test:e2e
+    # Paystack
+    PAYSTACK_SECRET_KEY=sk_xxxxxxxxxxxx
 
-# test coverage
-$ npm run test:cov
-```
+    # Google OAuth
+    GOOGLE_CLIENT_ID=xxxxxxxxxxxx.apps.googleusercontent.com
+    GOOGLE_CLIENT_SECRET=xxxxxxxxxxxx
 
-## Deployment
+    # JWT
+    JWT_SECRET=your_strong_jwt_secret
+    ```
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+4.  **Run Database Migrations:**
+    *(Assuming you have a migration script in `package.json`. If not, TypeORM will sync entities if configured).*
+    ```bash
+    # Example command - you may need to add this to your package.json
+    # "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
+    # "migration:run": "npm run typeorm -- -d ./src/data-source.ts migration:run"
+    
+    # If no migrations are set up, TypeORM's synchronize feature might be enabled for development.
+    ```
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Running the Application
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+-   **Development mode (with hot-reload):**
+    ```bash
+    npm run start:dev
+    ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+-   **Production mode:**
+    ```bash
+    npm run build
+    npm run start:prod
+    ```
 
-## Resources
+The application will be running on `http://localhost:3001`. The Swagger API documentation will be available at `http://localhost:3000/api`.
 
-Check out a few resources that may come in handy when working with NestJS:
+## API Endpoints
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+The following is a brief overview of the main API endpoints. For detailed information, please refer to the Swagger documentation.
 
-## Support
+-   `GET /auth/google` - Initiate Google OAuth2 login.
+-   `GET /auth/google/callback` - Callback URL for Google OAuth2.
+-   `POST /api-key/generate` - Generate a new API key with specified permissions.
+-   `POST /wallet/deposit` - Initialize a deposit transaction.
+-   `GET /wallet/balance` - Get the current wallet balance.
+-   `POST /wallet/transfer` - Transfer funds to another wallet.
+-   `GET /wallet/transactions` - Get user's transaction history.
+-   `POST /wallet/paystack/webhook` - Webhook endpoint for Paystack events.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Running Tests
 
-## Stay in touch
+-   **Run unit tests:**
+    ```bash
+    npm run test
+    ```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+-   **Run end-to-end (e2e) tests:**
+    ```bash
+    npm run test:e2e
+    ```
