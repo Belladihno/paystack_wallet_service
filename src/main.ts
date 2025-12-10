@@ -18,6 +18,7 @@ const requiredEnvVars = [
   'GOOGLE_CLIENT_SECRET',
   'PAYSTACK_SECRET_KEY',
   'PAYSTACK_PUBLIC_KEY',
+  'BASE_URL',
 ];
 
 function validateEnvironmentVariables(): void {

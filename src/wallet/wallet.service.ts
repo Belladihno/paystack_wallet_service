@@ -110,7 +110,7 @@ export class WalletService {
         amount: dto.amount * 100, // Paystack expects kobo
         email: userEmail || 'test@example.com',
         reference,
-        callback_url: 'http://localhost:3001/wallet/deposit/callback',
+        callback_url: `${process.env.BASE_URL}/wallet/deposit/callback`,
       });
 
       return {
