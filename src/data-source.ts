@@ -1,9 +1,6 @@
 import 'dotenv/config';
 import { DataSource } from 'typeorm';
-import { User } from './entities/user.entity';
-import { Wallet } from './entities/wallet.entity';
-import { Transaction } from './entities/transaction.entity';
-import { ApiKey } from './entities/api-key.entity';
+import { User, Wallet, Transaction, ApiKey } from './entities';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -13,7 +10,7 @@ export const AppDataSource = new DataSource({
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
   entities: [User, Wallet, Transaction, ApiKey],
-  migrations: ['src/migrations/*.ts'],
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  migrations: ['dist/migrations/*.js'],
+  ssl: false,
   synchronize: false,
 });
