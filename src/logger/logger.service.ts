@@ -15,10 +15,6 @@ export class CustomLogger implements LoggerService {
       ),
       defaultMeta: { service: 'paystack-wallet-service' },
       transports: [
-        // Write all logs with importance level of `error` or less to `error.log`
-        new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-        // Write all logs with importance level of `info` or less to `combined.log`
-        new winston.transports.File({ filename: 'logs/combined.log' }),
         // Also log to console in development
         new winston.transports.Console({
           format: winston.format.combine(
