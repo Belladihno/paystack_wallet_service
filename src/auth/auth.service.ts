@@ -23,40 +23,16 @@ export class AuthService {
   ): Promise<User> {
     let user = await this.userRepository.findOne({ where: { googleId } });
     if (!user) {
-      // Create new user
       user = this.userRepository.create({ googleId, email, name });
       user = await this.userRepository.save(user);
-      console.log(`New user created: ${user.id}, ${user.email}`);
 
       // auto-create wallet
-      try {
-        const walletNumber = await this.generateWalletNumber();
-        console.log(`Generated wallet number: ${walletNumber} for user: ${user.id}`);
-
-        const wallet = this.walletRepository.create({
-          userId: user.id,
-          walletNumber,
-        });
-        await this.walletRepository.save(wallet);
-        console.log(`Wallet created successfully for user: ${user.id}`);
-      } catch (walletError) {
-        console.error(`Failed to create wallet for user ${user.id}: ${walletError.message}`);
-        // Continue without wallet creation to allow user login
-      }
-    } else {
-      console.log(`Existing user found: ${user.id}, ${user.email}`);
-
-      // Check if user has a wallet
-      try {
-        const wallet = await this.walletRepository.findOne({ where: { userId: user.id } });
-        if (!wallet) {
-          console.warn(`Existing user ${user.id} has no wallet!`);
-        } else {
-          console.log(`User ${user.id} has wallet: ${wallet.walletNumber}`);
-        }
-      } catch (walletCheckError) {
-        console.error(`Failed to check wallet for user ${user.id}: ${walletCheckError.message}`);
-      }
+      const walletNumber = await this.generateWalletNumber();
+      const wallet = this.walletRepository.create({
+        userId: user.id,
+        walletNumber,
+      });
+      await this.walletRepository.save(wallet);
     }
     return user;
   }
