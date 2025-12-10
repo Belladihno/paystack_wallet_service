@@ -44,7 +44,7 @@ import { CustomLogger } from './logger/logger.service';
       database: process.env.DATABASE_NAME,
       entities: [User, Wallet, Transaction, ApiKey],
       migrations: ['src/migrations/*.ts'],
-      synchronize: true, // Re-enabled after migration drops old tables
+      synchronize: false, 
     }),
     AuthModule,
     ApiKeyModule,
