@@ -45,6 +45,16 @@ import { CustomLogger } from './logger/logger.service';
       entities: [User, Wallet, Transaction, ApiKey],
       migrations: ['src/migrations/*.ts'],
       synchronize: false, 
+      retryAttempts: 3, // ADDED: Retry connection 3 times
+      retryDelay: 3000, // ADDED: Wait 3 seconds between retries
+      connectTimeoutMS: 5000, // ADDED: Timeout after 5 seconds
+      ssl:
+        process.env.NODE_ENV === 'production'
+          ? { rejectUnauthorized: false }
+          : false, // ADDED: SSL for production
+      extra: {
+        connectionTimeoutMillis: 5000, // ADDED: Extra timeout config
+      },
     }),
     AuthModule,
     ApiKeyModule,
@@ -53,6 +63,9 @@ import { CustomLogger } from './logger/logger.service';
     SchedulerModule,
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: APP_FILTER, useClass: AllExceptionsFilter }],
+  providers: [
+    AppService,
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+  ],
 })
 export class AppModule {}

@@ -17,7 +17,7 @@ const requiredEnvVars = [
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
   'PAYSTACK_SECRET_KEY',
-  'PAYSTACK_PUBLIC_KEY'
+  'PAYSTACK_PUBLIC_KEY',
 ];
 
 function validateEnvironmentVariables(): void {
@@ -31,7 +31,7 @@ function validateEnvironmentVariables(): void {
 
   if (missingVars.length > 0) {
     console.error('Missing required environment variables:');
-    missingVars.forEach(variable => {
+    missingVars.forEach((variable) => {
       console.error(`   - ${variable}`);
     });
     process.exit(1);
@@ -41,75 +41,93 @@ function validateEnvironmentVariables(): void {
 }
 
 async function bootstrap(): Promise<void> {
-  // Validate environment variables first
-  validateEnvironmentVariables();
+  try {
+    // Validate environment variables first
+    validateEnvironmentVariables();
 
-  const customLogger = new CustomLogger();
-  const app = await NestFactory.create(AppModule, {
-    logger: customLogger,
-  });
+    console.log('Creating NestJS application...');
+    const customLogger = new CustomLogger();
+    const app = await NestFactory.create(AppModule, {
+      logger: customLogger,
+    });
 
-  // Global exception filter
-  app.useGlobalFilters(new AllExceptionsFilter());
+    console.log('Application created successfully');
 
-  // Global response interceptor
-  app.useGlobalInterceptors(new ResponseInterceptor());
+    // Global exception filter
+    app.useGlobalFilters(new AllExceptionsFilter());
+    console.log('Exception filter configured');
 
-  // Global validation pipe
-  app.useGlobalPipes(new ValidationPipe({
-    transform: true,
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transformOptions: {
-      enableImplicitConversion: true,
-    },
-  }));
+    // Global response interceptor
+    app.useGlobalInterceptors(new ResponseInterceptor());
+    console.log('Response interceptor configured');
 
-  // Swagger documentation
-  const config = new DocumentBuilder()
-    .setTitle('Paystack Wallet Service API')
-    .setDescription('A comprehensive wallet service with Paystack integration, JWT authentication, and API key management')
-    .setVersion('1.0')
-    .addTag('auth', 'Authentication endpoints')
-    .addTag('wallet', 'Wallet operations')
-    .addTag('keys', 'API key management')
-    .addTag('health', 'Health monitoring')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Enter JWT token',
-        in: 'header',
+    // Global validation pipe
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transformOptions: {
+          enableImplicitConversion: true,
+        },
+      }),
+    );
+    console.log('Validation pipe configured');
+
+    // Swagger documentation
+    const config = new DocumentBuilder()
+      .setTitle('Paystack Wallet Service API')
+      .setDescription(
+        'A comprehensive wallet service with Paystack integration, JWT authentication, and API key management',
+      )
+      .setVersion('1.0')
+      .addTag('auth', 'Authentication endpoints')
+      .addTag('wallet', 'Wallet operations')
+      .addTag('keys', 'API key management')
+      .addTag('health', 'Health monitoring')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Enter JWT token',
+          in: 'header',
+        },
+        'JWT-auth',
+      )
+      .addApiKey(
+        {
+          type: 'apiKey',
+          name: 'x-api-key',
+          in: 'header',
+          description: 'API key for service-to-service authentication',
+        },
+        'api-key',
+      )
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
       },
-      'JWT-auth',
-    )
-    .addApiKey(
-      {
-        type: 'apiKey',
-        name: 'x-api-key',
-        in: 'header',
-        description: 'API key for service-to-service authentication',
-      },
-      'api-key',
-    )
-    .build();
+    });
+    console.log('Swagger documentation configured');
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      tagsSorter: 'alpha',
-      operationsSorter: 'alpha',
-    },
-  });
-
-  await app.listen(process.env.PORT || 3001, '0.0.0.0');
-  console.log(`Application is running on: http://localhost:${process.env.PORT ?? 3001}`);
+    console.log('Starting server...');
+    const port = process.env.PORT || 3001;
+    await app.listen(port, '0.0.0.0');
+    console.log(`Application is running on: http://0.0.0.0:${port}`);
+    console.log(`Swagger docs available at: http://0.0.0.0:${port}/api`);
+    console.log(`Health check available at: http://0.0.0.0:${port}/health`);
+  } catch (error) {
+    console.error('Application failed to start:', error);
+    console.error('Error details:', error);
+    process.exit(1);
+  }
 }
 
-bootstrap().catch((error) => {
-  console.error('Application failed to start:', error);
-  process.exit(1);
-});
+bootstrap();
