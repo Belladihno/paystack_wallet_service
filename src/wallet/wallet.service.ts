@@ -48,24 +48,31 @@ export class WalletService {
       throw new BadRequestException('User email required for deposit');
     }
 
-    // Check for existing pending deposit to prevent duplicates (idempotency)
+    // Check for existing pending deposit with same amount to prevent duplicates (idempotency)
     const existingPending = await this.transactionRepository.findOne({
       where: {
         userId,
+        amount: dto.amount, // Make it amount-specific
         status: TransactionStatus.PENDING,
         type: TransactionType.DEPOSIT,
       },
       order: { createdAt: 'DESC' },
     });
 
-    if (
-      existingPending &&
-      Date.now() - existingPending.createdAt.getTime() < 300000
-    ) {
-      // 5 minutes
-      throw new BadRequestException(
-        'Pending deposit already exists. Please wait for completion or check status.',
-      );
+    if (existingPending) {
+      const timeSinceCreation = Date.now() - existingPending.createdAt.getTime();
+      const oneMinute = 60000; // 1 minute in milliseconds
+
+      if (timeSinceCreation < oneMinute) {
+        // Provide better messaging with pending deposit details
+        const remainingTime = Math.ceil((oneMinute - timeSinceCreation) / 1000);
+        throw new BadRequestException(
+          `Pending deposit of ₦${dto.amount} already exists. ` +
+          `Status: ${existingPending.status}. ` +
+          `Please wait ${remainingTime} seconds or check deposit status using reference: ${existingPending.reference}`,
+        );
+      }
+      // If older than 1 minute, allow new deposit (transaction may have failed)
     }
 
     let transaction: Transaction | undefined;
