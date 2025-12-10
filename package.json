@@ -6,7 +6,7 @@
   "private": false,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build --webpack",
+    "build": "nest build",
     "start:prod": "node dist/main",
     "migration:run": "npm run typeorm migration:run -- -d dist/data-source.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
