@@ -20,11 +20,6 @@ const requiredEnvVars = [
   'PAYSTACK_PUBLIC_KEY',
 ];
 
-// Optional environment variables with defaults
-const optionalEnvVars = {
-  DATABASE_SSL: 'false', // Default to false for local development
-};
-
 function validateEnvironmentVariables(): void {
   const missingVars: string[] = [];
 
@@ -43,14 +38,6 @@ function validateEnvironmentVariables(): void {
   }
 
   console.log('All required environment variables are present');
-
-  // Set defaults for optional environment variables
-  for (const [varName, defaultValue] of Object.entries(optionalEnvVars)) {
-    if (!process.env[varName]) {
-      process.env[varName] = defaultValue;
-      console.log(`Set default for ${varName}: ${defaultValue}`);
-    }
-  }
 }
 
 async function bootstrap(): Promise<void> {

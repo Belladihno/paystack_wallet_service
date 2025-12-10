@@ -71,53 +71,15 @@ export class WalletService {
     let transaction: Transaction | undefined;
 
     try {
-      // Enhanced wallet lookup with detailed logging and auto-creation fallback
-      this.logger.log(`Looking up wallet for user: ${userId}`, 'deposit');
-  
-      let wallet = await this.walletRepository.findOne({ where: { userId } });
+      const wallet = await this.walletRepository.findOne({ where: { userId } });
       this.logger.debug(
-        `Wallet lookup result for user ${userId}: ${JSON.stringify(wallet)}`,
+        `Wallet found for user ${userId}: ${!!wallet}`,
         'deposit',
       );
   
       if (!wallet) {
-        this.logger.error(
-          `Wallet not found for user ${userId}. This could be due to: ` +
-          '1) Database connection failure, 2) User exists but wallet was never created, ' +
-          '3) Database query failure',
-          'deposit',
-        );
-  
-        // Check if we can connect to database at all
-        try {
-          const dbHealthCheck = await this.walletRepository.query('SELECT 1');
-          this.logger.log('Database connection is healthy', 'deposit');
-  
-          // Auto-create wallet if database is healthy but wallet doesn't exist
-          this.logger.log(`Attempting to auto-create wallet for user: ${userId}`, 'deposit');
-          try {
-            const walletNumber = 'W' + Math.random().toString().slice(2, 15);
-            wallet = this.walletRepository.create({
-              userId: userId,
-              walletNumber: walletNumber,
-              balance: 0,
-            });
-            await this.walletRepository.save(wallet);
-            this.logger.log(`Wallet auto-created successfully: ${wallet.walletNumber}`, 'deposit');
-          } catch (walletCreationError) {
-            this.logger.error(
-              `Failed to auto-create wallet for user ${userId}: ${walletCreationError.message}`,
-              'deposit',
-            );
-            throw new BadRequestException('Wallet not found and could not be created');
-          }
-        } catch (dbError) {
-          this.logger.error(
-            `Database connection failed during wallet lookup: ${dbError.message}`,
-            'deposit',
-          );
-          throw new BadRequestException('Database connection failed');
-        }
+        this.logger.error(`Wallet not found for user: ${userId}`, 'deposit');
+        throw new BadRequestException('Wallet not found');
       }
 
       const reference = this.generateReference();
