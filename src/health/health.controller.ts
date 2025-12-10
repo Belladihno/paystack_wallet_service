@@ -3,34 +3,36 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 
-@Controller('health')
+@Controller()
 export class HealthController {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
   ) {}
 
-  @Get()
+  @Get('/health')
   async healthCheck() {
     try {
-      // Simple database connectivity check
       await this.userRepository.count();
 
       return {
         status: 'ok',
-        timestamp: new Date().toISOString(),
         service: 'paystack-wallet-service',
-        version: '1.0.0',
         database: 'connected',
       };
     } catch (error) {
       return {
         status: 'error',
-        timestamp: new Date().toISOString(),
         service: 'paystack-wallet-service',
         database: 'disconnected',
         error: error.message,
       };
     }
+  }
+
+  // Required by Leepcell
+  @Get('/kaithheathcheck')
+  leepcellHealthCheck() {
+    return { status: 'ok' };
   }
 }
