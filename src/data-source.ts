@@ -1,5 +1,9 @@
+import 'dotenv/config';
 import { DataSource } from 'typeorm';
-import { User, Wallet, Transaction, ApiKey } from './entities';
+import { User } from './entities/user.entity';
+import { Wallet } from './entities/wallet.entity';
+import { Transaction } from './entities/transaction.entity';
+import { ApiKey } from './entities/api-key.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
