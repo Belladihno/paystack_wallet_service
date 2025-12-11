@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { ApiKey } from '../entities/api-key.entity';
 import { User } from '../entities/user.entity';
-import { CreateApiKeyDto, CreateApiKeyResponseDto, RolloverApiKeyDto } from '../dto/api-key.dto';
+import { CreateApiKeyDto, CreateApiKeyResponseDto, RolloverApiKeyDto, ApiKeyListResponseDto } from '../dto/api-key.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -103,6 +103,29 @@ export class ApiKeyService {
     }
     key.revoked = true;
     await this.apiKeyRepository.save(key);
+  }
+
+  async getUserApiKeys(userId: string): Promise<ApiKeyListResponseDto> {
+    const keys = await this.apiKeyRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
+
+    const keyList = keys.map(key => {
+      const status = key.revoked ? 'revoked' :
+                    key.expiresAt < new Date() ? 'expired' : 'active';
+
+      return {
+        id: key.id,
+        name: key.name,
+        permissions: key.permissions,
+        expires_at: key.expiresAt.toISOString(),
+        created_at: key.createdAt.toISOString(),
+        status: status,
+      };
+    });
+
+    return { keys: keyList };
   }
 
   async validateApiKey(apiKey: string): Promise<{ user: User; permissions: string[] } | null> {

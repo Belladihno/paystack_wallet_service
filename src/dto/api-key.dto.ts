@@ -35,3 +35,29 @@ export class RevokeApiKeyDto {
   @IsString()
   key_id: string;
 }
+
+export class ApiKeyListItemDto {
+  @IsString()
+  id: string;
+
+  @IsString()
+  name: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  permissions: Permission[];
+
+  @IsString()
+  expires_at: string;
+
+  @IsString()
+  created_at: string;
+
+  @IsString()
+  status: string;
+}
+
+export class ApiKeyListResponseDto {
+  @IsArray()
+  keys: ApiKeyListItemDto[];
+}
