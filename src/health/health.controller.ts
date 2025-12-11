@@ -2,7 +2,9 @@ import { Controller, Get } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('health')
 @Controller()
 export class HealthController {
   constructor(
@@ -11,6 +13,18 @@ export class HealthController {
   ) {}
 
   @Get('/health')
+  @ApiOperation({ summary: 'Health check endpoint' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns service health status',
+    schema: {
+      example: {
+        status: 'ok',
+        service: 'paystack-wallet-service',
+        database: 'connected',
+      },
+    },
+  })
   async healthCheck() {
     try {
       await this.userRepository.count();
@@ -32,6 +46,16 @@ export class HealthController {
 
   // Required by Leepcell
   @Get('/kaithheathcheck')
+  @ApiOperation({ summary: 'Leepcell health check endpoint' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns simple health status for Leepcell monitoring',
+    schema: {
+      example: {
+        status: 'ok',
+      },
+    },
+  })
   leepcellHealthCheck() {
     return { status: 'ok' };
   }

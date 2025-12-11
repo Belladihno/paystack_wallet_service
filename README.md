@@ -28,7 +28,7 @@ A robust backend service for a simple wallet system built with NestJS, integrate
 - **ORM**: [TypeORM](https://typeorm.io/)
 - **Authentication**: [Passport.js](https://www.passportjs.org/) (JWT & Google Strategy)
 - **Payments**: [Paystack](https://paystack.com/)
-- **API Documentation**: [Swagger](https://swagger.io/)
+- **API Documentation**: [Swagger](https://swagger.io/) - Interactive API documentation available at `/api-docs`
 
 ## Prerequisites
 
@@ -100,7 +100,30 @@ A robust backend service for a simple wallet system built with NestJS, integrate
     npm run start:prod
     ```
 
-The application will be running on `http://localhost:3001`. The Swagger API documentation will be available at `http://localhost:3000/api`.
+The application will be running on `http://localhost:3001`. The Swagger API documentation will be available at `http://localhost:3001/api-docs`.
+
+## Swagger API Documentation
+
+The service includes comprehensive Swagger/OpenAPI documentation for all endpoints. After starting the application, you can access the interactive API documentation at:
+
+```
+http://localhost:3001/api-docs
+```
+
+### Features:
+- **Interactive API Explorer**: Test endpoints directly from the browser
+- **Authentication Support**: Includes JWT authentication testing
+- **Detailed Descriptions**: Each endpoint has comprehensive documentation
+- **Request/Response Examples**: Clear examples of expected inputs and outputs
+- **Public & Private Endpoints**: All endpoints are documented, including the public `/users` endpoints
+
+### API Categories:
+- **App**: Basic application endpoints
+- **Auth**: Authentication endpoints (Google OAuth)
+- **API Keys**: API key management endpoints
+- **Health**: Service health check endpoints
+- **Wallet**: Wallet and transaction management endpoints
+- **Users**: User management endpoints (public access)
 
 ## API Endpoints
 
@@ -114,6 +137,8 @@ The following is a brief overview of the main API endpoints. For detailed inform
 -   `POST /wallet/transfer` - Transfer funds to another wallet.
 -   `GET /wallet/transactions` - Get user's transaction history.
 -   `POST /wallet/paystack/webhook` - Webhook endpoint for Paystack events.
+-   `GET /users` - Get all users with their wallet numbers (PUBLIC).
+-   `GET /users/:id` - Get a specific user with their wallet number (PUBLIC).
 
 ## Running Tests
 
