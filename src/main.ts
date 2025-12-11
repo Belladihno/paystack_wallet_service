@@ -27,14 +27,14 @@ async function bootstrap() {
     }),
   );
 
-  // Paystack webhook: capture raw body for HMAC verification
-  app.use(
-    '/wallet/paystack/webhook',
-    bodyParser.raw({ type: 'application/json' }),
-  );
-
-  // JSON parsing for other routes
-  app.use(bodyParser.json());
+  // IMPORTANT: Raw body ONLY for webhook, JSON for everything else
+  app.use((req, res, next) => {
+    if (req.originalUrl === '/wallet/paystack/webhook') {
+      bodyParser.raw({ type: 'application/json' })(req, res, next);
+    } else {
+      bodyParser.json()(req, res, next);
+    }
+  });
 
   const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');
