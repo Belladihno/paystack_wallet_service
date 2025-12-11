@@ -44,7 +44,7 @@ import { CustomLogger } from './logger/logger.service';
       database: process.env.DATABASE_NAME,
       entities: [User, Wallet, Transaction, ApiKey],
       migrations: [__dirname + '/migrations/**/*{.ts,.js}'], // ✅ Changed this line
-      synchronize: true,
+      synchronize: false,
       retryAttempts: 3, // ADDED: Retry connection 3 times
       retryDelay: 3000, // ADDED: Wait 3 seconds between retries
       connectTimeoutMS: 5000, // ADDED: Timeout after 5 seconds
