@@ -60,7 +60,8 @@ export class WalletService {
     });
 
     if (existingPending) {
-      const timeSinceCreation = Date.now() - existingPending.createdAt.getTime();
+      const timeSinceCreation =
+        Date.now() - existingPending.createdAt.getTime();
       const oneMinute = 60000; // 1 minute in milliseconds
 
       if (timeSinceCreation < oneMinute) {
@@ -68,8 +69,8 @@ export class WalletService {
         const remainingTime = Math.ceil((oneMinute - timeSinceCreation) / 1000);
         throw new BadRequestException(
           `Pending deposit of ₦${dto.amount} already exists. ` +
-          `Status: ${existingPending.status}. ` +
-          `Please wait ${remainingTime} seconds or check deposit status using reference: ${existingPending.reference}`,
+            `Status: ${existingPending.status}. ` +
+            `Please wait ${remainingTime} seconds or check deposit status using reference: ${existingPending.reference}`,
         );
       }
       // If older than 1 minute, allow new deposit (transaction may have failed)
@@ -83,7 +84,7 @@ export class WalletService {
         `Wallet found for user ${userId}: ${!!wallet}`,
         'deposit',
       );
-  
+
       if (!wallet) {
         this.logger.error(`Wallet not found for user: ${userId}`, 'deposit');
         throw new BadRequestException('Wallet not found');
@@ -319,7 +320,7 @@ export class WalletService {
         `Webhook already processed for event ID: ${eventId}`,
         'handleWebhook',
       );
-      return; 
+      return;
     }
 
     const expectedAmount = new Decimal(transaction.amount);
