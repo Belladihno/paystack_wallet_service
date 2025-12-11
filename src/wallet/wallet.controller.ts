@@ -2,19 +2,16 @@ import {
   Controller,
   Post,
   Get,
-  Body,
   Param,
   Req,
-  Query,
-  UseGuards,
   Headers,
-  BadRequestException,
   Logger,
+  BadRequestException,
+  Body,
+  UseGuards,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
-import { ApiTags } from '@nestjs/swagger';
-import { createHmac } from 'crypto';
 import { WalletService } from './wallet.service';
+import { createHmac } from 'crypto';
 import {
   DepositDto,
   DepositResponseDto,
@@ -24,23 +21,17 @@ import {
   TransferResponseDto,
   TransactionsResponseDto,
 } from '../dto/wallet.dto';
-import { PaystackWebhookDto } from '../dto/webhook.dto';
 import { CombinedAuthGuard } from '../guards/combined-auth.guard';
 import { Permissions } from '../guards/permissions.decorator';
 import { Permission } from '../entities/api-key.entity';
 
-@ApiTags('wallet')
 @Controller('wallet')
 export class WalletController {
   private readonly logger = new Logger(WalletController.name);
 
   constructor(private walletService: WalletService) {}
 
-  // -----------------------------------------------
-  // Deposit
-  // -----------------------------------------------
   @Post('deposit')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(CombinedAuthGuard)
   @Permissions(Permission.DEPOSIT)
   async deposit(
@@ -57,9 +48,6 @@ export class WalletController {
     return this.walletService.getDepositStatus(reference);
   }
 
-  // -----------------------------------------------
-  // Balance
-  // -----------------------------------------------
   @Get('balance')
   @UseGuards(CombinedAuthGuard)
   @Permissions(Permission.READ)
@@ -67,9 +55,6 @@ export class WalletController {
     return this.walletService.getBalance(req.user.id);
   }
 
-  // -----------------------------------------------
-  // Transfer
-  // -----------------------------------------------
   @Post('transfer')
   @UseGuards(CombinedAuthGuard)
   @Permissions(Permission.TRANSFER)
@@ -80,9 +65,6 @@ export class WalletController {
     return this.walletService.transfer(req.user.id, dto);
   }
 
-  // -----------------------------------------------
-  // Transactions
-  // -----------------------------------------------
   @Get('transactions')
   @UseGuards(CombinedAuthGuard)
   @Permissions(Permission.READ)
@@ -90,78 +72,19 @@ export class WalletController {
     return this.walletService.getTransactions(req.user.id);
   }
 
-  // -----------------------------------------------
-  // Deposit Callback (Frontend Redirect)
-  // -----------------------------------------------
-  @Get('deposit/callback')
-  async depositCallback(
-    @Query('reference') reference: string,
-    @Query('trxref') trxref: string,
-  ) {
-    this.logger.log(
-      `Deposit callback received for reference: ${reference}`,
-      'depositCallback',
-    );
-
-    try {
-      const statusResponse =
-        await this.walletService.getDepositStatus(reference);
-
-      return {
-        message: 'Payment callback received',
-        reference,
-        trxref,
-        status: statusResponse.status,
-        amount: statusResponse.amount,
-      };
-    } catch (error) {
-      this.logger.warn(
-        `Failed to get status for callback reference: ${reference}`,
-        'depositCallback',
-      );
-      return {
-        message: 'Payment callback received',
-        reference,
-        trxref,
-        status: 'unknown',
-      };
-    }
-  }
-
-  // -----------------------------------------------
-  // PAYSTACK WEBHOOK (PRODUCTION)
-  // -----------------------------------------------
+  // ----------------- PAYSTACK WEBHOOK -----------------
   @Post('paystack/webhook')
-  @Throttle({ webhook: { limit: 100, ttl: 60000 } })
   async handleWebhook(
     @Req() req: any,
     @Headers('x-paystack-signature') signature?: string,
-  ): Promise<{ status: boolean }> {
-    const rawBody = req.body; // Buffer
+  ) {
+    const rawBody = req.body; // Buffer from bodyParser.raw
+    if (!signature) throw new BadRequestException('Webhook signature required');
+
     const secret = process.env.PAYSTACK_SECRET_KEY;
+    if (!secret) throw new BadRequestException('Paystack secret not set');
 
-    this.logger.log(`Webhook attempt received`, 'handleWebhook');
-
-    if (!rawBody || !Buffer.isBuffer(rawBody)) {
-      this.logger.error(
-        'Raw body missing — ensure raw body parser is enabled for this route',
-      );
-      throw new BadRequestException('Invalid raw body');
-    }
-
-    if (!signature) {
-      this.logger.error('Missing webhook signature');
-      throw new BadRequestException('Webhook signature required');
-    }
-
-    // Validate that secret key is available
-    if (!secret) {
-      this.logger.error('Paystack secret key is not configured');
-      throw new BadRequestException('Server configuration error');
-    }
-
-    // Verify signature using raw body
-    const expectedSignature = createHmac('sha512', secret as string)
+    const expectedSignature = createHmac('sha512', secret)
       .update(rawBody)
       .digest('hex');
 
@@ -170,53 +93,10 @@ export class WalletController {
       throw new BadRequestException('Invalid webhook signature');
     }
 
-    this.logger.log('Webhook signature validated', 'handleWebhook');
+    const payload = JSON.parse(rawBody.toString());
+    await this.walletService.handleWebhook(payload.data);
 
-    // Parse JSON manually
-    let event: PaystackWebhookDto;
-    try {
-      event = JSON.parse(rawBody.toString('utf8'));
-    } catch (err) {
-      this.logger.error(`Failed to parse webhook body: ${err.message}`);
-      throw new BadRequestException('Invalid JSON');
-    }
-
-    // Process webhook
-    try {
-      await this.walletService.handleWebhook(event.data);
-      this.logger.log(
-        `Webhook processed successfully for reference: ${event.data.reference}`,
-        'handleWebhook',
-      );
-      return { status: true };
-    } catch (error) {
-      this.logger.error(
-        `Webhook processing failed: ${error.message}`,
-        'handleWebhook',
-      );
-      throw error;
-    }
-  }
-
-  // -----------------------------------------------
-  // PAYSTACK WEBHOOK (TESTING ONLY)
-  // -----------------------------------------------
-  @Post('paystack/webhook/test')
-  async testWebhook(@Body() body: PaystackWebhookDto) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new BadRequestException('Test webhook disabled in production');
-    }
-
-    this.logger.log(
-      `Test webhook received for reference: ${body.data.reference}`,
-      'handleTestWebhook',
-    );
-
-    await this.walletService.handleWebhook(body.data);
-
-    return {
-      status: true,
-      message: 'Test webhook processed successfully',
-    };
+    this.logger.log(`Webhook processed successfully: ${payload.data.reference}`);
+    return { status: true };
   }
 }
