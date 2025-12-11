@@ -11,6 +11,7 @@ import { ApiKeyModule } from './api-key/api-key.module';
 import { WalletModule } from './wallet/wallet.module';
 import { HealthModule } from './health/health.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { UserModule } from './user/user.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { CustomLogger } from './logger/logger.service';
 
@@ -61,6 +62,7 @@ import { CustomLogger } from './logger/logger.service';
     WalletModule,
     HealthModule,
     SchedulerModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [
