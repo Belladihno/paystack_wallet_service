@@ -5,8 +5,12 @@ import { AppModule } from './app.module';
 import { CustomLogger } from './logger/logger.service';
 import { ResponseInterceptor } from './interceptors/response.interceptor';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+import * as bodyParser from 'body-parser';
+import expressModule from 'express';
 
-// Environment variable validation
+// ---------------------------
+// ENV VAR VALIDATION
+// ---------------------------
 const requiredEnvVars = [
   'DATABASE_HOST',
   'DATABASE_PORT',
@@ -25,57 +29,60 @@ function validateEnvironmentVariables(): void {
   const missingVars: string[] = [];
 
   for (const envVar of requiredEnvVars) {
-    if (!process.env[envVar]) {
-      missingVars.push(envVar);
-    }
+    if (!process.env[envVar]) missingVars.push(envVar);
   }
 
   if (missingVars.length > 0) {
     console.error('Missing required environment variables:');
-    missingVars.forEach((variable) => {
-      console.error(`   - ${variable}`);
-    });
+    missingVars.forEach((v) => console.error(`   - ${v}`));
     process.exit(1);
   }
 
   console.log('All required environment variables are present');
 }
 
+// ---------------------------
+// BOOTSTRAP
+// ---------------------------
 async function bootstrap(): Promise<void> {
   try {
-    // Validate environment variables first
     validateEnvironmentVariables();
 
     console.log('Creating NestJS application...');
     const customLogger = new CustomLogger();
+
+    // Disable bodyParser globally, we'll handle JSON & raw separately
     const app = await NestFactory.create(AppModule, {
       logger: customLogger,
+      bodyParser: false,
     });
 
     console.log('Application created successfully');
 
-    // Global exception filter
+    // ---------------------------
+    // RAW BODY PARSER FOR PAYSTACK WEBHOOK
+    // ---------------------------
+    const webhookApp = expressModule();
+    webhookApp.use(bodyParser.raw({ type: '*/*' }));
+    app.use('/wallet/paystack/webhook', webhookApp);
+
+    // ---------------------------
+    // GLOBAL MIDDLEWARE
+    // ---------------------------
     app.useGlobalFilters(new AllExceptionsFilter());
-    console.log('Exception filter configured');
-
-    // Global response interceptor
     app.useGlobalInterceptors(new ResponseInterceptor());
-    console.log('Response interceptor configured');
-
-    // Global validation pipe
     app.useGlobalPipes(
       new ValidationPipe({
         transform: true,
         whitelist: true,
         forbidNonWhitelisted: true,
-        transformOptions: {
-          enableImplicitConversion: true,
-        },
+        transformOptions: { enableImplicitConversion: true },
       }),
     );
-    console.log('Validation pipe configured');
 
-    // Swagger documentation
+    // ---------------------------
+    // SWAGGER
+    // ---------------------------
     const config = new DocumentBuilder()
       .setTitle('Paystack Wallet Service API')
       .setDescription(
@@ -87,25 +94,10 @@ async function bootstrap(): Promise<void> {
       .addTag('keys', 'API key management')
       .addTag('health', 'Health monitoring')
       .addBearerAuth(
-        {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-          name: 'JWT',
-          description: 'Enter JWT token',
-          in: 'header',
-        },
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
         'JWT-auth',
       )
-      .addApiKey(
-        {
-          type: 'apiKey',
-          name: 'x-api-key',
-          in: 'header',
-          description: 'API key for service-to-service authentication',
-        },
-        'api-key',
-      )
+      .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
@@ -116,17 +108,17 @@ async function bootstrap(): Promise<void> {
         operationsSorter: 'alpha',
       },
     });
-    console.log('Swagger documentation configured');
 
-    console.log('Starting server...');
+    // ---------------------------
+    // START SERVER
+    // ---------------------------
     const port = process.env.PORT || 3001;
     await app.listen(port, '0.0.0.0');
-    console.log(`Application is running on: http://0.0.0.0:${port}`);
-    console.log(`Swagger docs available at: http://0.0.0.0:${port}/api`);
-    console.log(`Health check available at: http://0.0.0.0:${port}/health`);
+    console.log(`Application running on http://0.0.0.0:${port}`);
+    console.log(`Swagger docs at http://0.0.0.0:${port}/api`);
+    console.log(`Health check at http://0.0.0.0:${port}/health`);
   } catch (error) {
     console.error('Application failed to start:', error);
-    console.error('Error details:', error);
     process.exit(1);
   }
 }
